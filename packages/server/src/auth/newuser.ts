@@ -11,6 +11,17 @@ import { globalLogger } from '../logger';
 import { getUserByEmailInProject, getUserByEmailWithoutProject, tryLogin } from '../oauth/utils';
 import { makeValidationMiddleware } from '../util/validator';
 import { bcryptHashPassword } from './utils';
+import { newPatientHandler } from './newpatient';
+import { tokenHandler } from '../oauth/token';
+type TokenResponse = {
+  access_token?: string;
+  refresh_token?: string;
+  id_token?: string;
+  token_type?: string;
+  expires_in?: number;
+  error?: string;
+  [key: string]: any;
+};
 
 export const newUserValidator = makeValidationMiddleware([
   body('firstName').isLength({ min: 1, max: 128 }).withMessage('First name must be between 1 and 128 characters'),
@@ -87,14 +98,73 @@ export async function newUserHandler(req: Request, res: Response): Promise<void>
       userAgent: req.get('User-Agent'),
       allowNoMembership: true,
     });
-    res.status(200).json({ login: login.id });
+    if (!login || !login.id || !login.code) {
+      sendOutcome(res, badRequest('Login failed'));
+      return;
+    }
+    let token: TokenResponse | undefined;
+    if (req.body?.resourceType === 'Patient') {
+      let membership = await newPatientHandler({ body: { projectId, login: login.id, return: true } } as any, res);
+      if (membership) {
+        let codeVerifier =
+          'a76106fb50b5d817721aa66f5a521324ae2ab4752bb3d6531b1b22919430e6736b50530f2214f52706c94afe4630fa85eccd9c4921b44fa7938e28ff66555de7';
+        token = await issueTokenAfterRegistration({
+          code: login.code,
+          codeVerifier: codeVerifier,
+        });
+      }
+    }
+    //calling token
+    res.status(200).json({ login: login.id, code: login.code, token: token?.access_token, patiendId: token?.patient });
   } catch (err) {
     sendOutcome(res, normalizeOperationOutcome(err));
   }
 }
 
+async function issueTokenAfterRegistration(objParams: {
+  code: string;
+  codeVerifier: string;
+  clientId?: string;
+  redirectUri?: string;
+}): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const req = {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+      },
+      is: (type: string) => type === 'application/x-www-form-urlencoded',
+      body: {
+        grant_type: 'authorization_code',
+        code: objParams.code,
+        code_verifier: objParams.codeVerifier,
+        // client_id: objParams.clientId,
+        // redirect_uri: objParams.redirectUri,
+      },
+    } as unknown as Request;
+
+    const res = {
+      status: (_code: number) => res,
+      send: (data: any) => {
+        resolve(data);
+        return res;
+      },
+      json: (data: any) => {
+        resolve(data);
+        return res;
+      },
+    } as unknown as Response;
+
+    tokenHandler(req, res, (err?: any) => {
+      if (err) {
+        reject(err);
+      }
+    });
+  });
+}
+
 export async function createUser(request: Omit<NewUserRequest, 'recaptchaToken'>): Promise<WithId<User>> {
-  const { firstName, lastName, email, password, projectId } = request;
+  const { firstName, lastName, email, password, projectId, emailVerified } = request;
 
   const numPwns = await pwnedPassword(password);
   if (numPwns > 0) {
@@ -112,6 +182,7 @@ export async function createUser(request: Omit<NewUserRequest, 'recaptchaToken'>
     email,
     passwordHash,
     project: projectId && projectId !== 'new' ? { reference: `Project/${projectId}` } : undefined,
+    emailVerified: emailVerified === true || emailVerified === false ? emailVerified : undefined,
   });
   globalLogger.info('User created', { id: result.id, email });
   return result;

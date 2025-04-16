@@ -19,7 +19,7 @@ export const newPatientValidator = makeValidationMiddleware([
  * @param req - The HTTP request.
  * @param res - The HTTP response.
  */
-export async function newPatientHandler(req: Request, res: Response): Promise<void> {
+export async function newPatientHandler(req: Request, res: Response): Promise<any> {
   const systemRepo = getSystemRepo();
   const login = await systemRepo.readResource<Login>('Login', req.body.login);
 
@@ -41,11 +41,19 @@ export async function newPatientHandler(req: Request, res: Response): Promise<vo
 
   // Update the login
   const updated = await setLoginMembership(login, membership.id);
-
-  res.status(200).json({
-    login: updated.id,
-    code: updated.code,
-  });
+  if (req.body?.return) {
+    return {
+      id: membership.profile,
+      login: updated.id,
+      code: updated.code,
+    };
+  } else {
+    res.status(200).json({
+      id: membership.profile,
+      login: updated.id,
+      code: updated.code,
+    });
+  }
 }
 
 /**

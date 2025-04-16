@@ -40,7 +40,7 @@ describe('New user', () => {
     getConfig().recaptchaSecretKey = prevRecaptchaSecretKey;
   });
 
-  test('Success', async () => {
+  test('Success with new user registration', async () => {
     const res = await request(app)
       .post('/auth/newuser')
       .type('json')
@@ -55,7 +55,30 @@ describe('New user', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.login).toBeDefined();
-    expect(res.body.code).toBeUndefined();
+    expect(res.body.code).toBeDefined();
+    expect(res.body.token).toBeUndefined();
+    expect(res.body.patientId).toBeUndefined();
+  });
+
+  test('Success with new user and patient registration', async () => {
+    const res = await request(app)
+      .post('/auth/newuser')
+      .type('json')
+      .send({
+        resourceType: 'Patient',
+        firstName: 'Alexander',
+        lastName: 'Hamilton',
+        email: `alex${randomUUID()}@example.com`,
+        password: 'password!@#',
+        recaptchaToken: 'xyz',
+        projectId: 'ne39285734957349057430968745w',
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.login).toBeDefined();
+    expect(res.body.code).toBeDefined();
+    expect(res.body.token).toBeDefined();
+    expect(res.body.patientId).toBeDefined();
   });
 
   test('Register disabled', async () => {
@@ -570,5 +593,7 @@ describe('New user', () => {
     expect(res.status).toBe(200);
     expect(res.body.login).toBeDefined();
     expect(res.body.code).toBeUndefined();
+    expect(res.body.token).toBeUndefined();
+    expect(res.body.patientId).toBeUndefined();
   });
 });
