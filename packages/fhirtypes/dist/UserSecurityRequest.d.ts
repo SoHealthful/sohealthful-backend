@@ -95,7 +95,7 @@ export interface UserSecurityRequest {
   /**
    * The type of user security request.
    */
-  type?: 'invite' | 'verify-email' | 'reset';
+  type?: 'invite' | 'verify-email' | 'reset' | 'otp'; 
 
   /**
    * The user performing the security request.

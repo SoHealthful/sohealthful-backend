@@ -20,6 +20,7 @@ export const resetPasswordValidator = makeValidationMiddleware([
 
 export async function resetPasswordHandler(req: Request, res: Response): Promise<void> {
   const email = req.body.email.toLowerCase();
+  req.body.projectId = req.body.projectId || getConfig().defaultProjectId;
   if (await isExternalAuth(email)) {
     sendOutcome(res, badRequest('Cannot reset password for external auth. Contact your system administrator.'));
     return;
@@ -63,30 +64,59 @@ export async function resetPasswordHandler(req: Request, res: Response): Promise
     sendOutcome(res, allOk);
     return;
   }
-
-  const url = await resetPassword(user, 'reset', req.body.redirectUri);
-
-  if (req.body.sendEmail !== false) {
-    await sendEmail(systemRepo, {
-      to: user.email,
-      subject: 'Medplum Password Reset',
-      text: [
-        'Someone requested to reset your Medplum password.',
-        '',
-        'Please click on the following link:',
-        '',
-        url,
-        '',
-        'If you received this in error, you can safely ignore it.',
-        '',
-        'Thank you,',
-        'Medplum',
-        '',
-      ].join('\n'),
-    });
+  let url: any;
+  if (req.body?.type === 'otp') {
+    url = await resetPassword(user, 'otp', req.body.redirectUri);
+  } else {
+    url = await resetPassword(user, 'reset', req.body.redirectUri);
   }
 
-  sendOutcome(res, allOk);
+  if (req.body.sendEmail !== false) {
+    if (req.body?.type === 'otp') {
+      const [id, secret] = url.split('/');
+      // This UserSecurityRequest was created as part of a new user invite flow.
+      // Send a Welcome email to the user.
+      await sendEmail(systemRepo, {
+        to: user.email,
+        subject: 'Medplum Welcome',
+        text: [
+          'Welcome to Medplum!',
+          '',
+          'Please copy the following otp and paste:',
+          '',
+          secret, // otp
+          '',
+          'Thank you,',
+          'Medplum',
+          '',
+        ].join('\n'),
+      });
+      // sendOutcome(res, allOk);
+      res.status(200).json({
+        message: 'Successfully otp sent',
+        id: id,
+      });
+    } else {
+      await sendEmail(systemRepo, {
+        to: user.email,
+        subject: 'Medplum Password Reset',
+        text: [
+          'Someone requested to reset your Medplum password.',
+          '',
+          'Please click on the following link:',
+          '',
+          url,
+          '',
+          'If you received this in error, you can safely ignore it.',
+          '',
+          'Thank you,',
+          'Medplum',
+          '',
+        ].join('\n'),
+      });
+      sendOutcome(res, allOk);
+    }
+  }
 }
 
 /**
@@ -97,20 +127,54 @@ export async function resetPasswordHandler(req: Request, res: Response): Promise
  * @param redirectUri - Optional URI for redirection to the client application.
  * @returns The URL to reset the password.
  */
-export async function resetPassword(user: User, type: 'invite' | 'reset', redirectUri?: string): Promise<string> {
+export async function resetPassword(
+  user: User,
+  type: 'invite' | 'reset' | 'otp',
+  redirectUri?: string
+): Promise<string> {
   // Create the password change request
-  const systemRepo = getSystemRepo();
-  const pcr = await systemRepo.createResource<UserSecurityRequest>({
-    resourceType: 'UserSecurityRequest',
-    meta: {
-      project: resolveId(user.project),
-    },
-    type,
-    user: createReference(user),
-    secret: generateSecret(16),
-    redirectUri,
-  });
+  let pcr: UserSecurityRequest;
+  if (type === 'otp') {
+    // Generate a 5-digit numeric OTP
+    const otp = Math.floor(10000 + Math.random() * 90000).toString();
 
-  // Build the reset URL
-  return `${getConfig().appBaseUrl}setpassword/${pcr.id}/${pcr.secret}`;
+    // Set expiration time to 10 minutes from now
+    // const expirationTime = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    //1 minute
+    const expirationTime = new Date(Date.now() + 60 * 1000).toISOString();
+
+    const systemRepo = getSystemRepo();
+    pcr = await systemRepo.createResource<UserSecurityRequest>({
+      resourceType: 'UserSecurityRequest',
+      meta: {
+        project: resolveId(user.project),
+      },
+      type,
+      user: createReference(user),
+      secret: otp,
+      extension: [
+        {
+          url: `${getConfig().baseUrl}fhir/StructureDefinition/expirationTime`,
+          valueInstant: expirationTime,
+        },
+      ],
+      redirectUri,
+    });
+    // Build the reset URL
+    return `${pcr.id}/${pcr.secret}`;
+  } else {
+    const systemRepo = getSystemRepo();
+    pcr = await systemRepo.createResource<UserSecurityRequest>({
+      resourceType: 'UserSecurityRequest',
+      meta: {
+        project: resolveId(user.project),
+      },
+      type,
+      user: createReference(user),
+      secret: generateSecret(16),
+      redirectUri,
+    });
+    // Build the reset URL
+    return `${getConfig().appBaseUrl}setpassword/${pcr.id}/${pcr.secret}`;
+  }
 }
