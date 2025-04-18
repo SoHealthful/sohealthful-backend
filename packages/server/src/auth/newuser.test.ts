@@ -1,6 +1,7 @@
 import { badRequest } from '@medplum/core';
 import { OperationOutcome } from '@medplum/fhirtypes';
 import { randomUUID } from 'crypto';
+import * as emailUtils from '../email/email';
 import express from 'express';
 import { pwnedPassword } from 'hibp';
 import fetch from 'node-fetch';
@@ -13,6 +14,7 @@ import { registerNew } from './register';
 
 jest.mock('hibp');
 jest.mock('node-fetch');
+jest.mock('../email/email');
 
 const app = express();
 
@@ -55,12 +57,12 @@ describe('New user', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.login).toBeDefined();
-    expect(res.body.code).toBeDefined();
+    expect(res.body.code).toBeUndefined();
     expect(res.body.token).toBeUndefined();
     expect(res.body.patientId).toBeUndefined();
   });
 
-  test('Success with new user and patient registration', async () => {
+  test('Success with new user registration for Patient with an existing projectId', async () => {
     const res = await request(app)
       .post('/auth/newuser')
       .type('json')
@@ -79,6 +81,44 @@ describe('New user', () => {
     expect(res.body.code).toBeDefined();
     expect(res.body.token).toBeDefined();
     expect(res.body.patientId).toBeDefined();
+  });
+
+  test('Sends verification email to new patient when emailVerified is false', async () => {
+    const mockSendEmail = jest.spyOn(emailUtils, 'sendEmail').mockResolvedValue();
+    let email = `alex${randomUUID()}@example.com`;
+    const res = await request(app).post('/auth/newuser').type('json').send({
+      resourceType: 'Patient',
+      firstName: 'Alexander',
+      lastName: 'Hamilton',
+      email,
+      password: 'password!@#',
+      recaptchaToken: 'xyz',
+      projectId: 'ne39285734957349057430968745w',
+      emailVeirified: false,
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockSendEmail).toHaveBeenCalledTimes(1);
+    expect(mockSendEmail.mock.calls[0][1].to).toBe(email); // check recipient
+    expect(mockSendEmail.mock.calls[0][1].subject).toContain('Verify your email');
+  });
+
+  test('Invalid projectId for Patient with a new project creation', async () => {
+    const res = await request(app)
+      .post('/auth/newuser')
+      .type('json')
+      .send({
+        resourceType: 'Patient',
+        firstName: 'Alexander',
+        lastName: 'Hamilton',
+        email: `alex${randomUUID()}@example.com`,
+        password: 'password!@#',
+        recaptchaToken: 'xyz',
+        projectId: 'new',
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.issue[0].details.text).toBe('Invalid projectId');
   });
 
   test('Register disabled', async () => {

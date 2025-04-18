@@ -103,4 +103,43 @@ describe('Verify email', () => {
     });
     expect(res2.status).toBe(400);
   });
+
+  test('Custom Email Verification - Incorrect secret', async () =>
+    withTestContext(async () => {
+      const systemRepo = getSystemRepo();
+
+      const usr = await createUserSecurityRequest(systemRepo, user, 'verify-email');
+
+      const resInvalidSecret = await request(app).get(`/auth/verify-email/${usr.id}/${usr.secret.slice(0, -1)}`);
+      expect(resInvalidSecret.status).toBe(400);
+      expect(resInvalidSecret.text).toContain('Incorrect secret');
+    }));
+
+  test('Custom Email Verification - Already used', async () =>
+    withTestContext(async () => {
+      const systemRepo = getSystemRepo();
+
+      const usr = await createUserSecurityRequest(systemRepo, user, 'verify-email');
+
+      const verifiedRequest = await systemRepo.readResource<UserSecurityRequest>('UserSecurityRequest', usr.id);
+      expect(verifiedRequest.used).toBe(true);
+      expect(verifiedRequest.text).toContain('Already used');
+    }));
+
+  test('Custom Email Verification - Success email verified', async () =>
+    withTestContext(async () => {
+      const systemRepo = getSystemRepo();
+
+      const usr = await createUserSecurityRequest(systemRepo, user, 'verify-email');
+
+      const resValid = await request(app).get(`/auth/verify-email/${usr.id}/${usr.secret}`);
+      expect(resValid.status).toBe(200);
+      expect(resValid.text).toContain('✅ Email Verified');
+
+      const verifiedRequest = await systemRepo.readResource<UserSecurityRequest>('UserSecurityRequest', usr.id);
+      expect(verifiedRequest.used).toBe(true);
+
+      const updatedUser = await systemRepo.readResource<User>('User', user.id);
+      expect(updatedUser.emailVerified).toBe(true);
+    }));
 });

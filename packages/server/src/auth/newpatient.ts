@@ -43,13 +43,11 @@ export async function newPatientHandler(req: Request, res: Response): Promise<an
   const updated = await setLoginMembership(login, membership.id);
   if (req.body?.return) {
     return {
-      id: membership.profile,
       login: updated.id,
       code: updated.code,
     };
   } else {
     res.status(200).json({
-      id: membership.profile,
       login: updated.id,
       code: updated.code,
     });

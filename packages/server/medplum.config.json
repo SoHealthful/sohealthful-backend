@@ -10,9 +10,8 @@
   "supportEmail": "\"Medplum\" <support@medplum.com>",
   "googleClientId": "397236612778-c0b5tnjv98frbo1tfuuha5vkme3cmq4s.apps.googleusercontent.com",
   "googleClientSecret": "",
-  "recaptchaSiteKey": "6LfHdsYdAAAAAC0uLnnRrDrhcXnziiUwKd8VtLNq",
-  "recaptchaSecretKey": "6LfHdsYdAAAAAH9dN154jbJ3zpQife3xaiTvPChL",
   "adminClientId": "2a4b77f2-4d4e-43c6-9b01-330eb5ca772f",
+  "defaultProjectId": "019647bd-ed9f-722f-9dd8-442a4d7bd1ff",
   "maxJsonSize": "1mb",
   "maxBatchSize": "50mb",
   "botLambdaRoleArn": "",
@@ -23,9 +22,9 @@
   "introspectionEnabled": true,
   "smtp": {
     "host": "sandbox.smtp.mailtrap.io",
-    "port": 2525,
-    "username": "638ebbe8d18d8e",
-    "password": "6bc44b1d520db5"
+    "port": 587,
+    "username": "639e8617b94af8",
+    "password": "73c470f41eaa96"
   },
   "database": {
     "host": "localhost",

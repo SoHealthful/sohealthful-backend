@@ -1,5 +1,6 @@
 import { ResourceType } from '@medplum/fhirtypes';
 import { randomUUID } from 'crypto';
+import { getConfig } from '../config/loader';
 import { Request, Response } from 'express';
 import { body } from 'express-validator';
 import { getLogger } from '../logger';
@@ -28,7 +29,8 @@ export async function loginHandler(req: Request, res: Response): Promise<void> {
   const login = await tryLogin({
     authMethod: 'password',
     clientId,
-    projectId,
+    projectId: req.body.projectId || getConfig().defaultProjectId,
+    // projectId,
     resourceType,
     scope: req.body.scope || 'openid',
     nonce: req.body.nonce || randomUUID(),
