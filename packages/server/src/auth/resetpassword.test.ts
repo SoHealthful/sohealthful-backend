@@ -113,6 +113,54 @@ describe('Reset Password', () => {
     expect(parsed.subject).toBe('Medplum Password Reset');
   });
 
+  test('Successfully otp sent - if type is otp', async () => {
+    const email = `recaptcha-client${randomUUID()}@example.com`;
+    const password = 'password!@#';
+
+    const project = await withTestContext(async () => {
+      // Register and create a project
+      const { project, user } = await registerNew({
+        firstName: 'Reset',
+        lastName: 'Reset',
+        projectName: 'Reset Project',
+        email,
+        password,
+      });
+
+      // Add the project to the user
+      await systemRepo.patchResource('User', resolveId(user) as string, [
+        {
+          path: '/project',
+          op: 'add',
+          value: createReference(project),
+        },
+      ]);
+
+      return project;
+    });
+
+    const res2 = await request(app).post('/auth/resetpassword').type('json').send({
+      email,
+      recaptchaToken: 'xyz',
+      type: 'otp',
+      projectId: project.id,
+    });
+    expect(res2.status).toBe(200);
+
+    expect(res2.body).toHaveProperty('message', 'Successfully otp sent');
+    expect(res2.body).toHaveProperty('id');
+    expect(typeof res2.body.id).toBe('string');
+
+    expect(SESv2Client).toHaveBeenCalledTimes(1);
+    expect(SendEmailCommand).toHaveBeenCalledTimes(1);
+
+    const args = (SendEmailCommand as unknown as jest.Mock).mock.calls[0][0];
+    expect(args.Destination.ToAddresses[0]).toBe(email);
+
+    const parsed = await simpleParser(args.Content.Raw.Data);
+    expect(parsed.subject).toBe('Verify Your OTP');
+  });
+
   test('Success no send email', async () => {
     const email = `george${randomUUID()}@example.com`;
 

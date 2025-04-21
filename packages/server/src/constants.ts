@@ -6,3 +6,4 @@
  *     r4ProjectId = v5('R4', nullUuid)
  */
 export const r4ProjectId = '161452d9-43b7-5c29-aa7b-c85680fa45c6';
+export const demoprojectId = '161452d9-43b7-5c29-aa7b-c85680fa44c2';

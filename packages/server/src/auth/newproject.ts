@@ -1,5 +1,5 @@
 import { badRequest, createReference } from '@medplum/core';
-import { Login, ProjectMembership, Reference, User } from '@medplum/fhirtypes';
+import { Login, Project, ProjectMembership, Reference, User } from '@medplum/fhirtypes';
 import { Request, Response } from 'express';
 import { body } from 'express-validator';
 import { createProject } from '../fhir/operations/projectinit';
@@ -47,4 +47,23 @@ export async function newProjectHandler(req: Request, res: Response): Promise<vo
     login: updatedLogin.id,
     code: updatedLogin.code,
   });
+}
+
+export async function getProject(req: Request, res: Response): Promise<any> {
+  const id = req.params.id;
+  const systemRepo = getSystemRepo();
+  if (!id) {
+    return res.status(400).json(badRequest('Project id is required'));
+  }
+
+  try {
+    const project = await systemRepo.readResource<Project>('Project', id);
+    if (project) {
+      return res.json({ id: project.id });
+    }
+    return res.status(404).json({ message: 'Project not found' });
+  } catch (err) {
+    console.error('Error searching project:', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
 }

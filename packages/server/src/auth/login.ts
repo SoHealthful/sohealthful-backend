@@ -1,12 +1,13 @@
 import { ResourceType } from '@medplum/fhirtypes';
 import { randomUUID } from 'crypto';
-import { getConfig } from '../config/loader';
 import { Request, Response } from 'express';
 import { body } from 'express-validator';
 import { getLogger } from '../logger';
 import { tryLogin } from '../oauth/utils';
 import { makeValidationMiddleware } from '../util/validator';
 import { getProjectIdByClientId, sendLoginResult } from './utils';
+import dotenv from 'dotenv';
+dotenv.config();
 
 export const loginValidator = makeValidationMiddleware([
   body('email').isEmail().withMessage('Valid email address is required'),
@@ -29,8 +30,7 @@ export async function loginHandler(req: Request, res: Response): Promise<void> {
   const login = await tryLogin({
     authMethod: 'password',
     clientId,
-    projectId: req.body.projectId || getConfig().defaultProjectId,
-    // projectId,
+    projectId,
     resourceType,
     scope: req.body.scope || 'openid',
     nonce: req.body.nonce || randomUUID(),

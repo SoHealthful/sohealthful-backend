@@ -74,11 +74,14 @@ describe('New user', () => {
         password: 'password!@#',
         recaptchaToken: 'xyz',
         projectId: 'ne39285734957349057430968745w',
+        codeChallenge: 'xyz',
+        codeChallengeMethod: 'S256',
+        codeVerifier: '28743rweuihwre',
       });
 
     expect(res.status).toBe(200);
     expect(res.body.login).toBeDefined();
-    expect(res.body.code).toBeDefined();
+    expect(res.body.code).toBeUndefined();
     expect(res.body.token).toBeDefined();
     expect(res.body.patientId).toBeDefined();
   });

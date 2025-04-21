@@ -20,7 +20,6 @@ export const resetPasswordValidator = makeValidationMiddleware([
 
 export async function resetPasswordHandler(req: Request, res: Response): Promise<void> {
   const email = req.body.email.toLowerCase();
-  req.body.projectId = req.body.projectId || getConfig().defaultProjectId;
   if (await isExternalAuth(email)) {
     sendOutcome(res, badRequest('Cannot reset password for external auth. Contact your system administrator.'));
     return;
@@ -78,9 +77,9 @@ export async function resetPasswordHandler(req: Request, res: Response): Promise
       // Send a Welcome email to the user.
       await sendEmail(systemRepo, {
         to: user.email,
-        subject: 'Medplum Welcome',
+        subject: 'Verify Your OTP',
         text: [
-          'Welcome to Medplum!',
+          'OTP Verification',
           '',
           'Please copy the following otp and paste:',
           '',

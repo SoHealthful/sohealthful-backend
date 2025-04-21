@@ -16,6 +16,8 @@ import { makeValidationMiddleware } from '../util/validator';
 import { bcryptHashPassword } from './utils';
 import { newPatientHandler } from './newpatient';
 import { tokenHandler } from '../oauth/token';
+import dotenv from 'dotenv';
+dotenv.config();
 type TokenResponse = {
   access_token?: string;
   refresh_token?: string;
@@ -59,10 +61,7 @@ export async function newUserHandler(req: Request, res: Response): Promise<void>
 
   const systemRepo = getSystemRepo();
 
-  // let projectId = req.body.projectId as string | undefined;
-  let projectId = (req.body?.projectId as string) || getConfig().defaultProjectId;
-  req.body.projectId = projectId;
-
+  let projectId = req.body.projectId as string | undefined;
   // If the user specifies a client ID, then make sure it is compatible with the project
   const clientId = req.body.clientId;
   let client: ClientApplication | undefined = undefined;
@@ -152,7 +151,7 @@ export async function newUserHandler(req: Request, res: Response): Promise<void>
         });
       }
     }
-    res.status(200).json({ login: login.id, code: login.code, token: token?.access_token, patiendId: token?.patient });
+    res.status(200).json({ login: login.id, token: token?.access_token, patiendId: token?.patient });
   } catch (err) {
     sendOutcome(res, normalizeOperationOutcome(err));
   }

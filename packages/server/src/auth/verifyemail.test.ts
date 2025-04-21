@@ -104,15 +104,15 @@ describe('Verify email', () => {
     expect(res2.status).toBe(400);
   });
 
-  test('Custom Email Verification - Incorrect secret', async () =>
+  test('Custom Email Verification - Invalid user security request type', async () =>
     withTestContext(async () => {
       const systemRepo = getSystemRepo();
 
       const usr = await createUserSecurityRequest(systemRepo, user, 'verify-email');
 
-      const resInvalidSecret = await request(app).get(`/auth/verify-email/${usr.id}/${usr.secret.slice(0, -1)}`);
-      expect(resInvalidSecret.status).toBe(400);
-      expect(resInvalidSecret.text).toContain('Incorrect secret');
+      const resInvaliType = await request(app).get(`/auth/verify-email/${usr.id}/${usr.secret}`);
+      expect(resInvaliType.status).toBe(400);
+      expect(resInvaliType.text).toContain('Invalid user security request type');
     }));
 
   test('Custom Email Verification - Already used', async () =>
@@ -124,6 +124,17 @@ describe('Verify email', () => {
       const verifiedRequest = await systemRepo.readResource<UserSecurityRequest>('UserSecurityRequest', usr.id);
       expect(verifiedRequest.used).toBe(true);
       expect(verifiedRequest.text).toContain('Already used');
+    }));
+
+  test('Custom Email Verification - Incorrect secret', async () =>
+    withTestContext(async () => {
+      const systemRepo = getSystemRepo();
+
+      const usr = await createUserSecurityRequest(systemRepo, user, 'verify-email');
+
+      const resInvalidSecret = await request(app).get(`/auth/verify-email/${usr.id}/${usr.secret.slice(0, -1)}`);
+      expect(resInvalidSecret.status).toBe(400);
+      expect(resInvalidSecret.text).toContain('Incorrect secret');
     }));
 
   test('Custom Email Verification - Success email verified', async () =>
