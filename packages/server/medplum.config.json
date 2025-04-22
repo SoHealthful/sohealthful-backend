@@ -19,12 +19,6 @@
   "defaultBotRuntimeVersion": "vmcontext",
   "allowedOrigins": "*",
   "introspectionEnabled": true,
-  "smtp": {
-    "host": "sandbox.smtp.mailtrap.io",
-    "port": 587,
-    "username": "be42280760c94c",
-    "password": "28a0afe0037a01"
-  },
   "database": {
     "host": "localhost",
     "port": 5432,

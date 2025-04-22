@@ -16,17 +16,9 @@ import { makeValidationMiddleware } from '../util/validator';
 import { bcryptHashPassword } from './utils';
 import { newPatientHandler } from './newpatient';
 import { tokenHandler } from '../oauth/token';
+import { TokenResponse } from '../config/types';
 import dotenv from 'dotenv';
 dotenv.config();
-type TokenResponse = {
-  access_token?: string;
-  refresh_token?: string;
-  id_token?: string;
-  token_type?: string;
-  expires_in?: number;
-  error?: string;
-  [key: string]: any;
-};
 
 export const newUserValidator = makeValidationMiddleware([
   body('firstName').isLength({ min: 1, max: 128 }).withMessage('First name must be between 1 and 128 characters'),
@@ -142,7 +134,7 @@ export async function newUserHandler(req: Request, res: Response): Promise<void>
     }
 
     let token: TokenResponse | undefined;
-    if (req.body?.resourceType === 'Patient' && req.body.projectId && req.body.projectId !== 'new') {
+    if (req.body?.resourceType === 'Patient' && req.body.projectId) {
       let membership = await newPatientHandler({ body: { projectId, login: login.id, return: true } } as any, res);
       if (membership) {
         token = await issueTokenAfterRegistration({

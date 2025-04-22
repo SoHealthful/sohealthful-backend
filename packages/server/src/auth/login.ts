@@ -6,8 +6,6 @@ import { getLogger } from '../logger';
 import { tryLogin } from '../oauth/utils';
 import { makeValidationMiddleware } from '../util/validator';
 import { getProjectIdByClientId, sendLoginResult } from './utils';
-import dotenv from 'dotenv';
-dotenv.config();
 
 export const loginValidator = makeValidationMiddleware([
   body('email').isEmail().withMessage('Valid email address is required'),
