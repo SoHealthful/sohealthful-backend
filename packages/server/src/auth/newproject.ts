@@ -6,6 +6,7 @@ import { createProject } from '../fhir/operations/projectinit';
 import { sendOutcome } from '../fhir/outcomes';
 import { getSystemRepo } from '../fhir/repo';
 import { makeValidationMiddleware } from '../util/validator';
+import { getConfig } from '../config/loader';
 
 export interface NewProjectRequest {
   readonly loginId: string;
@@ -50,7 +51,7 @@ export async function newProjectHandler(req: Request, res: Response): Promise<vo
 }
 
 export async function getProject(req: Request, res: Response): Promise<any> {
-  const id = req.params.id;
+  const id = getConfig().projectId;
   const systemRepo = getSystemRepo();
   if (!id) {
     return res.status(400).json(badRequest('Project id is required'));

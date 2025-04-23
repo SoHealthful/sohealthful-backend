@@ -1,6 +1,7 @@
 import { KeepJobs } from 'bullmq';
 
 export interface MedplumServerConfig {
+  projectId: string;
   port: number;
   baseUrl: string;
   issuer: string;

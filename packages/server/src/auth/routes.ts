@@ -31,7 +31,7 @@ authRouter.get('/external', asyncWrap(externalCallbackHandler));
 authRouter.get('/me', authenticateRequest, asyncWrap(meHandler));
 authRouter.post('/newuser', newUserValidator, validateRecaptcha(projectRegistrationAllowed), asyncWrap(newUserHandler));
 authRouter.post('/newproject', newProjectValidator, asyncWrap(newProjectHandler));
-authRouter.get('/project/:id', asyncWrap(getProject));
+authRouter.get('/projectid', asyncWrap(getProject));
 authRouter.post('/newpatient', newPatientValidator, asyncWrap(newPatientHandler));
 authRouter.post('/login', loginValidator, asyncWrap(loginHandler));
 authRouter.post('/profile', profileValidator, asyncWrap(profileHandler));
