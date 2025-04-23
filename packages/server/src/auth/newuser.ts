@@ -1,8 +1,6 @@
 import { badRequest, NewUserRequest, createReference, normalizeOperationOutcome, WithId } from '@medplum/core';
 import { ClientApplication, User } from '@medplum/fhirtypes';
-import { generateSecret } from '../oauth/keys';
 import { randomUUID } from 'crypto';
-import Mail from 'nodemailer/lib/mailer';
 import { sendEmail } from '../email/email';
 import { Request, Response } from 'express';
 import { body } from 'express-validator';
@@ -38,7 +36,6 @@ export const newUserValidator = makeValidationMiddleware([
  */
 export async function newUserHandler(req: Request, res: Response): Promise<void> {
   const config = getConfig();
-  const secret = generateSecret(16);
 
   if (config.registerEnabled === false) {
     // Explicitly check for "false" because the config value may be undefined
@@ -85,31 +82,43 @@ export async function newUserHandler(req: Request, res: Response): Promise<void>
 
   try {
     let newUser = await createUser({ ...req.body, email } as NewUserRequest);
-
+    let pcr;
     if (newUser?.emailVerified === false) {
-      const pcr = await systemRepo.createResource({
+      const otp = Math.floor(10000 + Math.random() * 90000).toString();
+
+      //1 minute
+      const expirationTime = new Date(Date.now() + 60 * 1000).toISOString();
+      pcr = await systemRepo.createResource({
         resourceType: 'UserSecurityRequest',
         user: createReference(newUser),
-        type: 'verify-email', // or 'invite'
-        secret,
+        // type: 'otp',
+        secret: otp,
+        extension: [
+          {
+            url: `${getConfig().baseUrl}fhir/StructureDefinition/expirationTime`,
+            valueInstant: expirationTime,
+          },
+          {
+            url: `${getConfig().baseUrl}fhir/StructureDefinition/securityRequestType`,
+            valueCode: 'otp', // or 'login', 'mfa', etc. if you're adding different sub-types
+          },
+        ],
       });
-      let emailVerifiedUrl = `${getConfig().baseUrl}auth/verify-email/${pcr.id}/${pcr.secret}`;
-      const options: Mail.Options = {
-        to: newUser.email,
-        subject: 'Verify your email',
+      await sendEmail(systemRepo, {
+        to: email,
+        subject: 'Verify Your OTP',
         text: [
-          `Hello!`,
+          'OTP Verification',
           '',
-          'Please click the following link verify your email:',
+          'Please copy the following otp and paste:',
           '',
-          emailVerifiedUrl,
+          otp, // otp
           '',
           'Thank you,',
-          'Your App Team',
+          'Medplum',
+          '',
         ].join('\n'),
-      };
-
-      await sendEmail(systemRepo, options);
+      });
       globalLogger.info('Email verification sent', { email });
     }
 
@@ -127,6 +136,7 @@ export async function newUserHandler(req: Request, res: Response): Promise<void>
       remoteAddress: req.ip,
       userAgent: req.get('User-Agent'),
       allowNoMembership: true,
+      isEmailCheck: false,
     });
     if (!login?.id || !login?.code) {
       sendOutcome(res, badRequest('Login failed'));
@@ -143,7 +153,12 @@ export async function newUserHandler(req: Request, res: Response): Promise<void>
         });
       }
     }
-    res.status(200).json({ login: login.id, token: token?.access_token, patiendId: token?.patient });
+    res.status(200).json({
+      login: login.id,
+      token: token?.access_token,
+      patiendId: token?.patient,
+      otpId: pcr?.id,
+    });
   } catch (err) {
     sendOutcome(res, normalizeOperationOutcome(err));
   }

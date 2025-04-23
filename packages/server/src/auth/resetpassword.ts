@@ -148,13 +148,17 @@ export async function resetPassword(
       meta: {
         project: resolveId(user.project),
       },
-      type,
+      // type,
       user: createReference(user),
       secret: otp,
       extension: [
         {
           url: `${getConfig().baseUrl}fhir/StructureDefinition/expirationTime`,
           valueInstant: expirationTime,
+        },
+        {
+          url: `${getConfig().baseUrl}fhir/StructureDefinition/securityRequestType`,
+          valueCode: 'otp', // or 'login', 'mfa', etc. if you're adding different sub-types
         },
       ],
       redirectUri,

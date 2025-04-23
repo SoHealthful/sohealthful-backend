@@ -323,6 +323,22 @@ describe('verifyOtp', () => {
     (fetch as unknown as jest.Mock).mockClear();
     setupRecaptchaMock(fetch as unknown as jest.Mock, true);
   });
+  test('Success - Email verified successfully', async () => {
+    let payload = {
+      id: '893475983416535',
+      otp: '12345',
+      type: 'verify-email',
+    };
+    const res = await request(app).post('/auth/verifyotp').type('json').send({
+      id: payload.id,
+      otp: payload.otp,
+      type: payload.type,
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('Email verified successfully');
+  });
+
   test('should verify OTP successfully', async () => {
     let payload = {
       id: '893475983416535',

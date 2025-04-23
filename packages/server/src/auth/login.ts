@@ -41,6 +41,7 @@ export async function loginHandler(req: Request, res: Response): Promise<void> {
     remoteAddress: req.ip,
     userAgent: req.get('User-Agent'),
     allowNoMembership: req.body.projectId === 'new',
+    isEmailCheck: true,
   });
 
   getLogger().info('Login success', { email: req.body.email, projectId });

@@ -86,7 +86,7 @@ describe('New user', () => {
     expect(res.body.patientId).toBeDefined();
   });
 
-  test('Sends verification email to new patient when emailVerified is false', async () => {
+  test('Sends otp on email to new patient when emailVerified is false', async () => {
     const mockSendEmail = jest.spyOn(emailUtils, 'sendEmail').mockResolvedValue();
     let email = `alex${randomUUID()}@example.com`;
     const res = await request(app).post('/auth/newuser').type('json').send({
@@ -103,7 +103,7 @@ describe('New user', () => {
     expect(res.status).toBe(200);
     expect(mockSendEmail).toHaveBeenCalledTimes(1);
     expect(mockSendEmail.mock.calls[0][1].to).toBe(email); // check recipient
-    expect(mockSendEmail.mock.calls[0][1].subject).toContain('Verify your email');
+    expect(mockSendEmail.mock.calls[0][1].subject).toContain('Verify Your OTP');
   });
 
   test('Invalid projectId for Patient with a new project creation', async () => {

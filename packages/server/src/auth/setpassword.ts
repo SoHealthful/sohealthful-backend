@@ -58,10 +58,11 @@ export async function setPasswordHandler(req: Request, res: Response): Promise<v
 
 export async function verifyOtp(req: Request, res: Response): Promise<any> {
   const systemRepo = getSystemRepo();
-  if (!req.body.otp && !req.body.id) {
+  if (!req.body.otp || !req.body.id) {
     return sendOutcome(res, badRequest('OTP is required'));
   }
   let securityRequest = await systemRepo.readResource<UserSecurityRequest>('UserSecurityRequest', req.body.id);
+  console.log('securityRequest', securityRequest);
   if (!securityRequest) {
     return sendOutcome(res, badRequest('Invalid id'));
   }
@@ -89,12 +90,22 @@ export async function verifyOtp(req: Request, res: Response): Promise<any> {
     }
   }
 
+  if (req.body?.type === 'verify-email') {
+    const user = await systemRepo.readReference(securityRequest.user as Reference<User>);
+    await systemRepo.withTransaction(async () => {
+      await systemRepo.updateResource<User>({ ...user, emailVerified: true });
+      await systemRepo.updateResource<UserSecurityRequest>({ ...securityRequest, used: true });
+    });
+    return res.status(200).json({
+      message: 'Email verified successfully',
+    });
+  }
+
   // Mark the OTP request as used
   await systemRepo.updateResource<UserSecurityRequest>({
     ...securityRequest,
     used: true,
   });
-
   const pcr = await systemRepo.createResource({
     resourceType: 'UserSecurityRequest',
     user: securityRequest.user,
