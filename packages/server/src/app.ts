@@ -43,6 +43,10 @@ import { storageRouter } from './storage/routes';
 import { closeWebSockets, initWebSockets } from './websockets';
 import { wellKnownRouter } from './wellknown';
 import { closeWorkers, initWorkers } from './workers';
+import swaggerUi from 'swagger-ui-express';
+import swaggerJsdoc from 'swagger-jsdoc';
+import { swaggerOptions } from '../swagger';
+const swaggerSpec = swaggerJsdoc(swaggerOptions);
 
 let server: http.Server | undefined = undefined;
 
@@ -152,6 +156,7 @@ export async function initApp(app: Express, config: MedplumServerConfig): Promis
   server = http.createServer(app);
   initWebSockets(server);
 
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
   app.set('etag', false);
   app.set('trust proxy', 1);
   app.set('x-powered-by', false);

@@ -156,7 +156,7 @@ export async function newUserHandler(req: Request, res: Response): Promise<void>
     res.status(200).json({
       login: login.id,
       token: token?.access_token,
-      patiendId: token?.patient,
+      patientId: token?.patient,
       otpId: pcr?.id,
     });
   } catch (err) {

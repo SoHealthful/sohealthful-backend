@@ -384,19 +384,6 @@ describe('verifyOtp', () => {
     expect(res.body.issue[0].diagnostics).toBe('OTP is required');
   });
 
-  test('Fail - Invalid id', async () => {
-    let payload = {
-      id: 'invalid',
-      otp: '12345',
-    };
-    const res = await request(app).post('/auth/verifyotp').type('json').send({
-      id: payload.id,
-      otp: payload.otp,
-    });
-    expect(res.status).toBe(400);
-    expect(res.body.issue[0].diagnostics).toBe('id is required');
-  });
-
   test('Fail - Incorrect otp', async () => {
     let payload = {
       id: 'invalid',

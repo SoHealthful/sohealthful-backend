@@ -62,10 +62,6 @@ export async function verifyOtp(req: Request, res: Response): Promise<any> {
     return sendOutcome(res, badRequest('OTP is required'));
   }
   let securityRequest = await systemRepo.readResource<UserSecurityRequest>('UserSecurityRequest', req.body.id);
-  console.log('securityRequest', securityRequest);
-  if (!securityRequest) {
-    return sendOutcome(res, badRequest('Invalid id'));
-  }
 
   if (securityRequest.used) {
     sendOutcome(res, badRequest('Already used'));
