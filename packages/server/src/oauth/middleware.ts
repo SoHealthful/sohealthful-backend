@@ -55,3 +55,43 @@ export async function authenticateTokenImpl(req: IncomingMessage): Promise<AuthS
 export function isExtendedMode(req: Request): boolean {
   return req.headers['x-medplum'] === 'extended';
 }
+
+// fine the activity details structure
+// interface ActivityDetails {
+//   userId: string | null;
+//   method: string;
+//   url: string;
+//   timestamp: Date;
+// }
+
+// Middleware to track user activity
+// export const activityTracker = (req: Request, res: Response, next: NextFunction): any => {
+//   // Check if user is authenticated, assuming a `user` object is attached to the `req` in a previous authentication middleware
+//   const user: any | null = req.user || null;
+
+//   // Extract timestamp and timezone from headers (sent by frontend)
+//   const timestamp = req.headers['timestamp'] as string | undefined;
+//   const timezone = req.headers['timezone'] as string | undefined;
+
+//   // If no user is authenticated, return an error response (optional)
+//   if (!user) {
+//     return res.status(401).json({ message: 'Unauthorized access: User not authenticated' });
+//   }
+
+//   // Get the request details
+//   const activityDetails: ActivityDetails = {
+//     userId: user.id, // Assuming user has an 'id' field
+//     method: req.method,
+//     url: req.originalUrl,
+//     timestamp: new Date(),
+//   };
+
+//   // Log activity to the console (you can also save it to a database)
+//   console.log('User Activity:', activityDetails);
+
+//   // Optionally, store activity in a database (e.g., MongoDB, PostgreSQL)
+//   // Example: ActivityModel.create(activityDetails); // Save to your database
+
+//   // Proceed to the next middleware or route handler
+//   next();
+// };

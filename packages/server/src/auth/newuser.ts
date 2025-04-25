@@ -27,6 +27,23 @@ export const newUserValidator = makeValidationMiddleware([
     .isLength({ min: 3, max: 72 })
     .withMessage('Valid email address between 3 and 72 characters is required'),
   body('password').isByteLength({ min: 8, max: 72 }).withMessage('Password must be between 8 and 72 characters'),
+  body('codeChallenge').exists({ checkFalsy: true }).withMessage('codeChallenge is required'),
+  body('codeChallengeMethod').exists({ checkFalsy: true }).withMessage('codeChallengeMethod is required'),
+  body('codeVerifier').exists({ checkFalsy: true }).withMessage('codeVerifier is required'),
+  body('emailVerified')
+    .exists()
+    .withMessage('emailVerified is required')
+    .isBoolean()
+    .withMessage('emailVerified must be a boolean value'),
+]);
+
+export const biometricValidator = makeValidationMiddleware([
+  body('userId').exists({ checkFalsy: true }).withMessage('userId is required'),
+  body('signatureKey').exists({ checkFalsy: true }).withMessage('signatureKey is required'),
+  body('deviceId').exists({ checkFalsy: true }).withMessage('deviceId is required'),
+]);
+export const projectIdValidator = makeValidationMiddleware([
+  body('projectId').exists({ checkFalsy: true }).withMessage('projectid is required'),
 ]);
 
 /**
@@ -68,7 +85,8 @@ export async function newUserHandler(req: Request, res: Response): Promise<void>
 
   // If the user is a practitioner, then projectId should be undefined
   // If the user is a patient, then projectId must be set
-  const email = req.body.email.toLowerCase();
+  const email = req.body?.email.toLowerCase();
+
   let existingUser = undefined;
   if (req.body.projectId && req.body.projectId !== 'new') {
     existingUser = await getUserByEmailInProject(email, req.body.projectId);
@@ -158,6 +176,7 @@ export async function newUserHandler(req: Request, res: Response): Promise<void>
       token: token?.access_token,
       patientId: token?.patient,
       otpId: pcr?.id,
+      userId: newUser.id,
     });
   } catch (err) {
     sendOutcome(res, normalizeOperationOutcome(err));
@@ -229,4 +248,64 @@ export async function createUser(request: Omit<NewUserRequest, 'recaptchaToken'>
   });
   globalLogger.info('User created', { id: result.id, email });
   return result;
+}
+
+export async function setBiometric(req: Request, res: Response): Promise<any> {
+  const { userId, signatureKey, deviceId } = req.body;
+  const systemRepo = getSystemRepo();
+  const user = await systemRepo.readResource<User>('User', userId);
+  console.log('oldUser:', user);
+  if (user?.extension) {
+    console.log('oldUser extension detail:', user.extension[0].extension);
+  }
+  if (!user) {
+    sendOutcome(res, badRequest('User not found'));
+    return;
+  }
+  // return;
+
+  const biometricData = user.extension?.find(
+    (ext) => ext.url === `${getConfig().baseUrl}fhir/StructureDefinition/biometric-data`
+  );
+
+  const newBiometricData = {
+    url: `${getConfig().baseUrl}fhir/StructureDefinition/biometric-data`,
+    extension: [
+      {
+        url: `${getConfig().baseUrl}fhir/StructureDefinition/deviceId`,
+        valueString: deviceId, // Replace with actual deviceId
+      },
+      {
+        url: `${getConfig().baseUrl}fhir/StructureDefinition/signatureKey`,
+        valueString: signatureKey, // Replace with actual signatureKey
+      },
+    ],
+  };
+
+  if (biometricData) {
+    biometricData.extension = biometricData.extension || [];
+    biometricData.extension.push(...newBiometricData.extension);
+  } else {
+    if (!user.extension) {
+      user.extension = [];
+    }
+    user.extension.push(newBiometricData);
+  }
+
+  try {
+    // Update the user without modifying other data
+    const userUpdated = await systemRepo.updateResource<User>({
+      ...user, // Spread the user object, including all other extensions
+    });
+    console.log('User updated:', userUpdated);
+
+    // Optionally check if the update was successful
+    const usercheck = await systemRepo.readResource<User>('User', userId);
+    console.log('User usercheck:', usercheck);
+
+    return res.status(200).json({ message: 'Biometric data updated successfully' });
+  } catch (error) {
+    console.error('Error updating user:', error);
+    sendOutcome(res, badRequest('Failed to update user'));
+  }
 }

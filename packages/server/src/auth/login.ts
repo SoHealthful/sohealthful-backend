@@ -10,6 +10,12 @@ import { getProjectIdByClientId, sendLoginResult } from './utils';
 export const loginValidator = makeValidationMiddleware([
   body('email').isEmail().withMessage('Valid email address is required'),
   body('password').isLength({ min: 5 }).withMessage('Invalid password, must be at least 5 characters'),
+  body('codeChallenge').exists({ checkFalsy: true }).withMessage('codeChallenge is required'),
+  body('codeChallengeMethod').exists({ checkFalsy: true }).withMessage('codeChallengeMethod is required'),
+]);
+
+export const emailValidator = makeValidationMiddleware([
+  body('email').isEmail().withMessage('Valid email address is required'),
 ]);
 
 export async function loginHandler(req: Request, res: Response): Promise<void> {

@@ -16,6 +16,7 @@ export const resetPasswordValidator = makeValidationMiddleware([
     .withMessage('Valid email address between 3 and 72 characters is required')
     .isLength({ min: 3, max: 72 })
     .withMessage('Valid email address between 3 and 72 characters is required'),
+  body('type').exists({ checkFalsy: true }).withMessage('type is required'),
 ]);
 
 export async function resetPasswordHandler(req: Request, res: Response): Promise<void> {
@@ -65,7 +66,7 @@ export async function resetPasswordHandler(req: Request, res: Response): Promise
   }
   let url: any;
   if (req.body?.type === 'otp') {
-    url = await resetPassword(user, 'otp', req.body.redirectUri);
+    url = await resetPassword(user, 'otp', req.body.redirectUri, req.body?.oldId);
   } else {
     url = await resetPassword(user, 'reset', req.body.redirectUri);
   }
@@ -129,20 +130,48 @@ export async function resetPasswordHandler(req: Request, res: Response): Promise
 export async function resetPassword(
   user: User,
   type: 'invite' | 'reset' | 'otp',
-  redirectUri?: string
+  redirectUri?: string,
+  oldId?: string
 ): Promise<string> {
   // Create the password change request
   let pcr: UserSecurityRequest;
   if (type === 'otp') {
-    // Generate a 5-digit numeric OTP
-    const otp = Math.floor(10000 + Math.random() * 90000).toString();
-
+    // Generate a 6-digit numeric OTP
+    const otp = Math.floor(100000 + Math.random() * 900000);
     // Set expiration time to 10 minutes from now
     // const expirationTime = new Date(Date.now() + 10 * 60 * 1000).toISOString();
     //1 minute
-    const expirationTime = new Date(Date.now() + 60 * 1000).toISOString();
+    const expirationTime = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
     const systemRepo = getSystemRepo();
+    let oldSecurityRequest: UserSecurityRequest | undefined;
+    if (oldId) {
+      oldSecurityRequest = await systemRepo.readResource<UserSecurityRequest>('UserSecurityRequest', oldId);
+      if (oldSecurityRequest) {
+        pcr = await systemRepo.updateResource<UserSecurityRequest>({
+          id: oldId,
+          resourceType: 'UserSecurityRequest',
+          meta: {
+            project: resolveId(user.project),
+          },
+          // type,
+          user: createReference(user),
+          secret: `${otp}`,
+          extension: [
+            {
+              url: `${getConfig().baseUrl}fhir/StructureDefinition/expirationTime`,
+              valueInstant: expirationTime,
+            },
+            {
+              url: `${getConfig().baseUrl}fhir/StructureDefinition/securityRequestType`,
+              valueCode: 'otp', // or 'login', 'mfa', etc. if you're adding different sub-types
+            },
+          ],
+          redirectUri,
+        });
+        return `${pcr.id}/${pcr.secret}`;
+      }
+    }
     pcr = await systemRepo.createResource<UserSecurityRequest>({
       resourceType: 'UserSecurityRequest',
       meta: {
@@ -150,7 +179,7 @@ export async function resetPassword(
       },
       // type,
       user: createReference(user),
-      secret: otp,
+      secret: `${otp}`,
       extension: [
         {
           url: `${getConfig().baseUrl}fhir/StructureDefinition/expirationTime`,
@@ -163,7 +192,7 @@ export async function resetPassword(
       ],
       redirectUri,
     });
-    // Build the reset URL
+
     return `${pcr.id}/${pcr.secret}`;
   } else {
     const systemRepo = getSystemRepo();
