@@ -6,7 +6,10 @@ import request from 'supertest';
 import { initApp, shutdownApp } from '../app';
 import { loadTestConfig } from '../config/loader';
 import { setupPwnedPasswordMock, setupRecaptchaMock } from '../test.setup';
-
+import { Request, Response } from 'express';
+import { getProject } from './newproject'; // Adjust this import to your actual file
+import { badRequest } from '@medplum/core';
+import { jest } from '@jest/globals';
 jest.mock('hibp');
 jest.mock('node-fetch');
 
@@ -290,5 +293,56 @@ describe('New project', () => {
     expect(res5.body.data).toBeDefined();
     expect(res5.body.data.PatientList).toBeDefined();
     expect(res5.body.data.PatientList.length).toStrictEqual(0);
+  });
+});
+
+// Mock systemRepo methods directly
+const systemRepo: any = {
+  readResource: jest.fn(),
+};
+
+describe('getProject function', () => {
+  let req: Partial<Request>;
+  let res: Partial<Response>;
+
+  beforeEach(() => {
+    req = {
+      params: { id: '237856387637634953495' }, // Mock query param for project name
+    };
+    res = {
+      status: jest.fn().mockReturnThis(), // mock the 'status' method to chain 'json'
+      json: jest.fn(),
+    } as Partial<Response>;
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks(); // Clear mocks between tests
+  });
+
+  test('should return 400 if project id is not provided', async () => {
+    req.params = {}; // Empty query for name
+    await getProject(req as Request, res as Response);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(badRequest('Project id is required'));
+  });
+
+  test('should return project ID if the project exists', async () => {
+    systemRepo.search.mockResolvedValue({ project: { id: '237856387637634953495' } });
+
+    await getProject(req as Request, res as Response);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ id: '237856387637634953495' });
+  });
+
+  test('should return Project not found', async () => {
+    // Mocking that the project doesn't exist
+    systemRepo.search.mockResolvedValue({ project: {} });
+
+    await getProject(req as Request, res as Response);
+
+    // Verify response
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith({ message: 'Project not found' });
   });
 });

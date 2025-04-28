@@ -1,7 +1,7 @@
 import { createReference } from '@medplum/core';
 import { Practitioner, Project, ProjectMembership, User } from '@medplum/fhirtypes';
 import { bcryptHashPassword } from './auth/utils';
-import { r4ProjectId } from './constants';
+import { r4ProjectId, demoprojectId } from './constants';
 import { getSystemRepo, Repository } from './fhir/repo';
 import { globalLogger } from './logger';
 import { rebuildR4SearchParameters } from './seeds/searchparameters';
@@ -17,6 +17,7 @@ export async function seedDatabase(): Promise<void> {
 
   await systemRepo.withTransaction(async () => {
     await createSuperAdmin(systemRepo);
+    await createDemoProject(systemRepo);
 
     globalLogger.info('Building structure definitions...');
     let startTime = Date.now();
@@ -84,6 +85,78 @@ async function createSuperAdmin(systemRepo: Repository): Promise<void> {
     resourceType: 'ProjectMembership',
     project: createReference(superAdminProject),
     user: createReference(superAdmin),
+    profile: createReference(practitioner),
+    admin: true,
+  });
+}
+
+async function createDemoProject(systemRepo: Repository): Promise<void> {
+  const [firstName, lastName, email] = ['demo', 'User', 'demouser@example.com'];
+  const passwordHash = await bcryptHashPassword('medplum_demo');
+  const demoUser = await systemRepo.createResource<User>({
+    resourceType: 'User',
+    firstName,
+    lastName,
+    email,
+    passwordHash,
+  });
+
+  let accessPolicy = await systemRepo.createResource({
+    resourceType: 'AccessPolicy',
+    name: 'Patient Access Policy Template',
+    compartment: {
+      reference: '%patient',
+    },
+    resource: [
+      { resourceType: 'Patient', criteria: 'Patient?_compartment=%patient' },
+      { resourceType: 'Observation', criteria: 'Observation?_compartment=%patient' },
+      { resourceType: 'DiagnosticReport', criteria: 'DiagnosticReport?_compartment=%patient' },
+      { resourceType: 'MedicationRequest', criteria: 'MedicationRequest?_compartment=%patient' },
+      { resourceType: 'Coverage', criteria: 'Coverage?_compartment=%patient' },
+      { resourceType: 'PaymentNotice', criteria: 'PaymentNotice?_compartment=%patient' },
+      { resourceType: 'CarePlan', criteria: 'CarePlan?_compartment=%patient' },
+      { resourceType: 'Immunization', criteria: 'Immunization?_compartment=%patient' },
+      { resourceType: 'Communication', criteria: 'Communication?_compartment=%patient' },
+      { resourceType: 'Organization', readonly: true },
+      { resourceType: 'Practitioner', readonly: true },
+      { resourceType: 'Schedule', readonly: true },
+      { resourceType: 'Slot', readonly: true },
+      { resourceType: 'Binary' },
+    ],
+  });
+
+  let demoProject = await systemRepo.updateResource<Project>({
+    resourceType: 'Project',
+    id: demoprojectId,
+    name: 'Demo project',
+    defaultPatientAccessPolicy: createReference(accessPolicy),
+    strictMode: true,
+  });
+
+  const practitioner = await systemRepo.createResource<Practitioner>({
+    resourceType: 'Practitioner',
+    meta: {
+      project: demoprojectId,
+    },
+    name: [
+      {
+        given: [firstName],
+        family: lastName,
+      },
+    ],
+    telecom: [
+      {
+        system: 'email',
+        use: 'work',
+        value: email,
+      },
+    ],
+  });
+
+  await systemRepo.createResource<ProjectMembership>({
+    resourceType: 'ProjectMembership',
+    project: createReference(demoProject),
+    user: createReference(demoUser),
     profile: createReference(practitioner),
     admin: true,
   });

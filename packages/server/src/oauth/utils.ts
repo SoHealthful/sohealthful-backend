@@ -76,6 +76,7 @@ export interface LoginRequest {
   readonly allowNoMembership?: boolean;
   /** @deprecated Use scope of "offline" or "offline_access" instead. */
   readonly remember?: boolean;
+  readonly isEmailCheck?: boolean;
 }
 
 export interface TokenResult {
@@ -163,6 +164,9 @@ export async function tryLogin(request: LoginRequest): Promise<WithId<Login>> {
     throw new OperationOutcomeError(badRequest('User not found'));
   }
 
+  if (request.isEmailCheck && user?.emailVerified === false) {
+    throw new OperationOutcomeError(badRequest('Email not verified'));
+  }
   await authenticate(request, user);
 
   const refreshSecret = includeRefreshToken(request) ? generateSecret(32) : undefined;

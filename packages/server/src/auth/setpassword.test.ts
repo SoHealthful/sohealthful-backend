@@ -305,3 +305,108 @@ describe('Set Password', () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe('verifyOtp', () => {
+  beforeAll(async () => {
+    const config = await loadTestConfig();
+    config.emailProvider = 'awsses';
+    await initApp(app, config);
+  });
+
+  afterAll(async () => {
+    await shutdownApp();
+  });
+
+  beforeEach(() => {
+    (SESv2Client as unknown as jest.Mock).mockClear();
+    (SendEmailCommand as unknown as jest.Mock).mockClear();
+    (fetch as unknown as jest.Mock).mockClear();
+    setupRecaptchaMock(fetch as unknown as jest.Mock, true);
+  });
+  test('Success - Email verified successfully', async () => {
+    let payload = {
+      id: '893475983416535',
+      otp: '12345',
+      type: 'verify-email',
+    };
+    const res = await request(app).post('/auth/verifyotp').type('json').send({
+      id: payload.id,
+      otp: payload.otp,
+      type: payload.type,
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('Email verified successfully');
+  });
+
+  test('should verify OTP successfully', async () => {
+    let payload = {
+      id: '893475983416535',
+      otp: '12345',
+    };
+    const res = await request(app).post('/auth/verifyotp').type('json').send({
+      id: payload.id,
+      otp: payload.otp,
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('OTP verified successfully');
+    expect(res.body).toHaveProperty('id');
+    expect(res.body).toHaveProperty('secret');
+
+    const verifiedRequest = await getSystemRepo().readResource<UserSecurityRequest>('UserSecurityRequest', res.body.id);
+    expect(verifiedRequest?.used).toBe(true);
+  });
+
+  test('Fail - Already used', async () => {
+    let payload = {
+      id: '893475983416535',
+      otp: '12345',
+    };
+    const res = await request(app).post('/auth/verifyotp').type('json').send({
+      id: payload.id,
+      otp: payload.otp,
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.issue[0].diagnostics).toBe('Already used');
+  });
+
+  test('Fail - OTP is required', async () => {
+    let payload = {
+      id: '893475983416535',
+      otp: undefined,
+    };
+    const res = await request(app).post('/auth/verifyotp').type('json').send({
+      id: payload.id,
+      otp: payload.otp,
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.issue[0].diagnostics).toBe('OTP is required');
+  });
+
+  test('Fail - Incorrect otp', async () => {
+    let payload = {
+      id: 'invalid',
+      otp: 'wrong',
+    };
+    const res = await request(app).post('/auth/verifyotp').type('json').send({
+      id: payload.id,
+      otp: payload.otp,
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.issue[0].diagnostics).toBe('id is required');
+  });
+
+  test('Fail - OTP has expired', async () => {
+    let payload = {
+      id: '893475983416535',
+      otp: '12345',
+    };
+    const res = await request(app).post('/auth/verifyotp').type('json').send({
+      id: payload.id,
+      otp: payload.otp,
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.issue[0].diagnostics).toBe('OTP has expired');
+  });
+});

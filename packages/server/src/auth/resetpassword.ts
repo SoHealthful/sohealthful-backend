@@ -16,6 +16,7 @@ export const resetPasswordValidator = makeValidationMiddleware([
     .withMessage('Valid email address between 3 and 72 characters is required')
     .isLength({ min: 3, max: 72 })
     .withMessage('Valid email address between 3 and 72 characters is required'),
+  body('type').exists({ checkFalsy: true }).withMessage('type is required'),
 ]);
 
 export async function resetPasswordHandler(req: Request, res: Response): Promise<void> {
@@ -63,30 +64,59 @@ export async function resetPasswordHandler(req: Request, res: Response): Promise
     sendOutcome(res, allOk);
     return;
   }
-
-  const url = await resetPassword(user, 'reset', req.body.redirectUri);
-
-  if (req.body.sendEmail !== false) {
-    await sendEmail(systemRepo, {
-      to: user.email,
-      subject: 'Medplum Password Reset',
-      text: [
-        'Someone requested to reset your Medplum password.',
-        '',
-        'Please click on the following link:',
-        '',
-        url,
-        '',
-        'If you received this in error, you can safely ignore it.',
-        '',
-        'Thank you,',
-        'Medplum',
-        '',
-      ].join('\n'),
-    });
+  let url: any;
+  if (req.body?.type === 'otp') {
+    url = await resetPassword(user, 'otp', req.body.redirectUri, req.body?.oldId);
+  } else {
+    url = await resetPassword(user, 'reset', req.body.redirectUri);
   }
 
-  sendOutcome(res, allOk);
+  if (req.body.sendEmail !== false) {
+    if (req.body?.type === 'otp') {
+      const [id, secret] = url.split('/');
+      // This UserSecurityRequest was created as part of a new user invite flow.
+      // Send a Welcome email to the user.
+      await sendEmail(systemRepo, {
+        to: user.email,
+        subject: 'Verify Your OTP',
+        text: [
+          'OTP Verification',
+          '',
+          'Please copy the following otp and paste:',
+          '',
+          secret, // otp
+          '',
+          'Thank you,',
+          'Medplum',
+          '',
+        ].join('\n'),
+      });
+      // sendOutcome(res, allOk);
+      res.status(200).json({
+        message: 'Successfully otp sent',
+        id: id,
+      });
+    } else {
+      await sendEmail(systemRepo, {
+        to: user.email,
+        subject: 'Medplum Password Reset',
+        text: [
+          'Someone requested to reset your Medplum password.',
+          '',
+          'Please click on the following link:',
+          '',
+          url,
+          '',
+          'If you received this in error, you can safely ignore it.',
+          '',
+          'Thank you,',
+          'Medplum',
+          '',
+        ].join('\n'),
+      });
+      sendOutcome(res, allOk);
+    }
+  }
 }
 
 /**
@@ -97,20 +127,86 @@ export async function resetPasswordHandler(req: Request, res: Response): Promise
  * @param redirectUri - Optional URI for redirection to the client application.
  * @returns The URL to reset the password.
  */
-export async function resetPassword(user: User, type: 'invite' | 'reset', redirectUri?: string): Promise<string> {
+export async function resetPassword(
+  user: User,
+  type: 'invite' | 'reset' | 'otp',
+  redirectUri?: string,
+  oldId?: string
+): Promise<string> {
   // Create the password change request
-  const systemRepo = getSystemRepo();
-  const pcr = await systemRepo.createResource<UserSecurityRequest>({
-    resourceType: 'UserSecurityRequest',
-    meta: {
-      project: resolveId(user.project),
-    },
-    type,
-    user: createReference(user),
-    secret: generateSecret(16),
-    redirectUri,
-  });
+  let pcr: UserSecurityRequest;
+  if (type === 'otp') {
+    // Generate a 6-digit numeric OTP
+    const otp = Math.floor(100000 + Math.random() * 900000);
+    // Set expiration time to 10 minutes from now
+    // const expirationTime = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    //1 minute
+    const expirationTime = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
-  // Build the reset URL
-  return `${getConfig().appBaseUrl}setpassword/${pcr.id}/${pcr.secret}`;
+    const systemRepo = getSystemRepo();
+    let oldSecurityRequest: UserSecurityRequest | undefined;
+    if (oldId) {
+      oldSecurityRequest = await systemRepo.readResource<UserSecurityRequest>('UserSecurityRequest', oldId);
+      if (oldSecurityRequest) {
+        pcr = await systemRepo.updateResource<UserSecurityRequest>({
+          id: oldId,
+          resourceType: 'UserSecurityRequest',
+          meta: {
+            project: resolveId(user.project),
+          },
+          // type,
+          user: createReference(user),
+          secret: `${otp}`,
+          extension: [
+            {
+              url: `${getConfig().baseUrl}fhir/StructureDefinition/expirationTime`,
+              valueInstant: expirationTime,
+            },
+            {
+              url: `${getConfig().baseUrl}fhir/StructureDefinition/securityRequestType`,
+              valueCode: 'otp', // or 'login', 'mfa', etc. if you're adding different sub-types
+            },
+          ],
+          redirectUri,
+        });
+        return `${pcr.id}/${pcr.secret}`;
+      }
+    }
+    pcr = await systemRepo.createResource<UserSecurityRequest>({
+      resourceType: 'UserSecurityRequest',
+      meta: {
+        project: resolveId(user.project),
+      },
+      // type,
+      user: createReference(user),
+      secret: `${otp}`,
+      extension: [
+        {
+          url: `${getConfig().baseUrl}fhir/StructureDefinition/expirationTime`,
+          valueInstant: expirationTime,
+        },
+        {
+          url: `${getConfig().baseUrl}fhir/StructureDefinition/securityRequestType`,
+          valueCode: 'otp', // or 'login', 'mfa', etc. if you're adding different sub-types
+        },
+      ],
+      redirectUri,
+    });
+
+    return `${pcr.id}/${pcr.secret}`;
+  } else {
+    const systemRepo = getSystemRepo();
+    pcr = await systemRepo.createResource<UserSecurityRequest>({
+      resourceType: 'UserSecurityRequest',
+      meta: {
+        project: resolveId(user.project),
+      },
+      type,
+      user: createReference(user),
+      secret: generateSecret(16),
+      redirectUri,
+    });
+    // Build the reset URL
+    return `${getConfig().appBaseUrl}setpassword/${pcr.id}/${pcr.secret}`;
+  }
 }

@@ -427,6 +427,7 @@ export interface NewUserRequest {
   readonly remember?: boolean;
   readonly projectId?: string;
   readonly clientId?: string;
+  readonly emailVerified?: boolean;
 }
 
 export interface NewProjectRequest {

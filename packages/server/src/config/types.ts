@@ -1,6 +1,7 @@
 import { KeepJobs } from 'bullmq';
 
 export interface MedplumServerConfig {
+  projectId: string;
   port: number;
   baseUrl: string;
   issuer: string;
@@ -135,4 +136,14 @@ export interface MedplumBullmqConfig {
   concurrency?: number;
   removeOnComplete: KeepJobs;
   removeOnFail: KeepJobs;
+}
+
+export interface TokenResponse {
+  access_token?: string;
+  refresh_token?: string;
+  id_token?: string;
+  token_type?: string;
+  expires_in?: number;
+  error?: string;
+  [key: string]: any;
 }

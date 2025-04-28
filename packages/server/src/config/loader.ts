@@ -98,6 +98,11 @@ function loadEnvConfig(): MedplumServerConfig {
     let key = name.substring('MEDPLUM_'.length);
     let currConfig = config;
 
+    if (key.startsWith('SMTP_')) {
+      key = key.substring('SMTP_'.length);
+      currConfig = config.smtp = config.smtp ?? {};
+    }
+
     if (key.startsWith('DATABASE_')) {
       key = key.substring('DATABASE_'.length);
       currConfig = config.database = config.database ?? {};
